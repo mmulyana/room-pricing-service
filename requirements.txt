@@ -1,0 +1,7 @@
+numpy
+fastapi
+tensorflow
+uvicorn[standard]
+signal
+sys
+pydantic
