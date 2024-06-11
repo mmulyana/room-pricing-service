@@ -8,6 +8,7 @@ from pydantic import BaseModel
 import os
 import pandas as pd
 import joblib
+import numpy as np
 
 app = FastAPI()
 
@@ -66,9 +67,35 @@ def predictRoom(predicted_df, property_name, room_id, check_in, check_out):
     )
 
 
+def predict_new(distance_to_coastline, lat, lng, check_in, check_out):
+    today = date.today()
+
+    date_check_in = datetime.strptime(check_in, "%Y-%m-%d").date()
+    date_check_out = datetime.strptime(check_out, "%Y-%m-%d").date()
+
+    booking_window_days = booking_window(today, date_check_in)
+    stay_duration_days = stay_duration(date_check_in, date_check_out)
+
+    data = np.array(
+        [[booking_window_days, distance_to_coastline, stay_duration_days, lat, lng]]
+    )
+
+    prediction_result = random_forest_model.predict(data)
+
+    return prediction_result.tolist()
+
+
 class Payload(BaseModel):
     property_name: str
     room_id: int
+    check_in: str
+    check_out: str
+
+
+class PayloadNew(BaseModel):
+    distance_to_coastline: int
+    lat: int
+    lng: int
     check_in: str
     check_out: str
 
@@ -91,6 +118,28 @@ async def predict(body: Payload):
                     "current_price": format_currency(current_price[0]),
                     "stay_duration_day": stay_duration,
                     "booking_window_day": booking_window,
+                },
+            }
+        )
+    except Exception as e:
+        return JSONResponse(content={"status": "fail", "error": str(e)})
+
+
+@app.post("/predict/new")
+async def predictNew(body: PayloadNew):
+    try:
+        prediction = predict_new(
+            body.distance_to_coastline,
+            body.lat,
+            body.lng,
+            body.check_in,
+            body.check_out,
+        )
+        return JSONResponse(
+            content={
+                "status": "success",
+                "data": {
+                    "prediction": format_currency(prediction[0]),
                 },
             }
         )
