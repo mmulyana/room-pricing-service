@@ -93,9 +93,14 @@ class Payload(BaseModel):
 
 
 class PayloadNew(BaseModel):
-    distance_to_coastline: int
-    lat: int
-    lng: int
+    lat: float
+    beds: int
+    bedroom: int
+    bathroom: int
+    parking: int
+    pool: int
+    beachfront: int
+    lng: float
     check_in: str
     check_out: str
 
@@ -128,13 +133,49 @@ async def predict(body: Payload):
 @app.post("/predict/new")
 async def predictNew(body: PayloadNew):
     try:
-        prediction = predict_new(
-            body.distance_to_coastline,
-            body.lat,
-            body.lng,
-            body.check_in,
-            body.check_out,
+        today = date.today()
+        date_check_in = datetime.strptime(body.check_in, "%Y-%m-%d").date()
+        date_check_out = datetime.strptime(body.check_out, "%Y-%m-%d").date()
+
+        booking_window_days = booking_window(today, date_check_in)
+
+        stay_duration_days = stay_duration(date_check_in, date_check_out)
+
+        array_data = np.array(
+            [
+                [
+                    booking_window_days,
+                    stay_duration_days,
+                    body.lat,
+                    body.beds,
+                    body.bedroom,
+                    body.bathroom,
+                    body.parking,
+                    body.pool,
+                    body.beachfront,
+                    body.lng,
+                ]
+            ]
         )
+
+        columns = [
+            "booking_window",
+            "stay_duration_in_days",
+            "lat",
+            "beds",
+            "bedroom",
+            "bathroom",
+            "parking",
+            "pool",
+            "beachfront",
+            "lng",
+        ]
+
+        data = pd.DataFrame(array_data, columns=columns)
+
+        model = joblib.load("random_forest_model.pkl")
+        prediction = model.predict(data)
+
         return JSONResponse(
             content={
                 "status": "success",
@@ -148,7 +189,7 @@ async def predictNew(body: PayloadNew):
 
 
 @app.get("/properties")
-async def get_properties():
+async def get_propert1ies():
     try:
         properties = distinct_data["property_name"].unique().tolist()
 
